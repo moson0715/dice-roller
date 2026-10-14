@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>史詩多面骰助手 | Epic Dice Roller</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Cinzel & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/tone.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cinzel: ['Cinzel', 'serif'],
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            900: '#0b0f19',
+                            800: '#111827',
+                            700: '#1f2937',
+                            600: '#374151',
+                        },
+                        amber: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at center, #1e1b4b 0%, #0b0f19 100%);
+            color: #f3f4f6;
+            min-height: 100vh;
+        }
+        .title-font {
+            font-family: 'Cinzel', serif;
+        }
+        .dice-container {
+            perspective: 1000px;
+        }
+        .dice-box {
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+        }
+        .dice-rolling {
+            animation: rollDice 0.6s ease-in-out;
+        }
+        @keyframes rollDice {
+            0% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.15) rotate(90deg) translateY(-15px); }
+            50% { transform: scale(0.9) rotate(180deg) translateY(10px); }
+            75% { transform: scale(1.05) rotate(270deg) translateY(-5px); }
+            100% { transform: scale(1) rotate(360deg); }
+        }
+        .glow-gold {
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.3);
+        }
+        .glow-gold-lg {
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.5);
+        }
+        /* Custom scrollbar for history */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen selection:bg-amber-500 selection:text-black">
+
+    <!-- Header -->
+    <header class="py-6 px-4 border-b border-gray-800 bg-dark-800/60 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-dark-900 shadow-lg glow-gold">
+                    <i class="fa-solid fa-dice text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="title-font text-xl md:text-2xl font-bold tracking-wider text-amber-400">Epic Dice Roller</h1>
+                    <p class="text-xs text-gray-400">多面骰助手與記憶引擎</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="soundToggle" onclick="toggleSound()" class="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 border border-gray-700 rounded-lg text-xs font-medium text-gray-300 transition flex items-center space-x-1.5">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-amber-400"></i>
+                    <span id="soundText">音效開啟</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+        
+        <!-- Left Column: Rolling Area & Controls (7 Cols) -->
+        <div class="md:col-span-7 flex flex-col space-y-6">
+            
+            <!-- Dice Display Stage -->
+            <div class="bg-dark-800/80 border border-gray-700/80 rounded-3xl p-8 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl glow-gold">
+                <!-- Background ambient glow -->
+                <div class="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-transparent pointer-events-none"></div>
+
+                <!-- Current N indicator badge -->
+                <div class="absolute top-4 left-4 bg-dark-900/80 border border-gray-700 px-3 py-1 rounded-full text-xs text-amber-400 font-mono tracking-wide flex items-center space-x-1.5">
+                    <i class="fa-solid fa-memory"></i>
+                    <span>目前記憶: <strong id="memoryDisplay" class="text-white">1d6</strong></span>
+                </div>
+
+                <!-- Dice Icon / Shape representation -->
+                <div class="dice-container my-6">
+                    <div id="diceBox" class="dice-box w-32 h-32 md:w-40 md:h-40 bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 rounded-2xl shadow-2xl flex flex-col items-center justify-center border-2 border-amber-300/40 cursor-pointer transform hover:scale-105 transition duration-300">
+                        <i id="diceIcon" class="fa-solid fa-dice-six text-4xl md:text-5xl text-dark-900 mb-2 drop-shadow"></i>
+                        <span id="diceTypeLabel" class="title-font text-xs font-bold text-dark-900 uppercase tracking-widest bg-amber-400/80 px-2 py-0.5 rounded">1d6</span>
+                    </div>
+                </div>
+
+                <!-- Result output -->
+                <div class="text-center mt-2">
+                    <p class="text-xs uppercase tracking-widest text-gray-400 font-medium mb-1">擲骰結果 (Result)</p>
+                    <div id="resultOutput" class="title-font text-5xl md:text-6xl font-black text-amber-400 tracking-tight drop-shadow-lg">
+                        —
+                    </div>
+                </div>
+
+                <!-- Main Roll Button -->
+                <button onclick="rollCurrentDice()" class="mt-8 w-full py-4 bg-gradient-to-r from-amber-500 hover:from-amber-400 to-amber-600 hover:to-amber-500 text-dark-900 font-bold title-font text-lg rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition transform duration-150 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-dice text-xl"></i>
+                    <span>立即擲骰 (ROLL)</span>
+                </button>
+            </div>
+
+            <!-- Custom N Input Section -->
+            <div class="bg-dark-800/80 border border-gray-700/80 rounded-2xl p-6 shadow-xl">
+                <h3 class="title-font text-sm font-semibold text-gray-300 mb-3 flex items-center space-x-2">
+                    <i class="fa-solid fa-keyboard text-amber-400"></i>
+                    <span>自訂多面骰 (Custom 1dN)</span>
+                </h3>
+                <div class="flex space-x-3">
+                    <div class="relative flex-grow">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 font-bold">1d</span>
+                        <input type="number" id="customNInput" min="2" max="10000" placeholder="輸入N值 (例: 20, 100)" 
+                            class="w-full pl-10 pr-4 py-3 bg-dark-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-mono text-base transition">
+                    </div>
+                    <button onclick="setCustomDice()" class="px-6 py-3 bg-dark-700 hover:bg-dark-600 border border-gray-600 text-white font-semibold rounded-xl hover:border-amber-500/50 transition flex items-center space-x-2">
+                        <span>設定/記憶</span>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">提示：輸入後會成為主動記憶目標，直到您輸入或點擊其他骰子。</p>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Quick Presets & History (5 Cols) -->
+        <div class="md:col-span-5 flex flex-col space-y-6">
+            
+            <!-- Quick Presets -->
+            <div class="bg-dark-800/80 border border-gray-700/80 rounded-2xl p-6 shadow-xl">
+                <h3 class="title-font text-sm font-semibold text-gray-300 mb-4 flex items-center space-x-2">
+                    <i class="fa-solid fa-bolt text-amber-400"></i>
+                    <span>預設快捷多面骰</span>
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="selectPreset(6)" class="preset-btn p-3 bg-dark-900 hover:bg-dark-700 border border-gray-700 hover:border-amber-500/80 rounded-xl text-left transition group flex items-center justify-between">
+                        <div>
+                            <span class="block title-font font-bold text-amber-400 text-base">1d6</span>
+                            <span class="text-xs text-gray-400">六面骰 (標準)</span>
+                        </div>
+                        <i class="fa-solid fa-dice-six text-gray-600 group-hover:text-amber-400 text-xl transition"></i>
+                    </button>
+                    <button onclick="selectPreset(10)" class="preset-btn p-3 bg-dark-900 hover:bg-dark-700 border border-gray-700 hover:border-amber-500/80 rounded-xl text-left transition group flex items-center justify-between">
+                        <div>
+                            <span class="block title-font font-bold text-amber-400 text-base">1d10</span>
+                            <span class="text-xs text-gray-400">十面骰</span>
+                        </div>
+                        <i class="fa-solid fa-dice text-gray-600 group-hover:text-amber-400 text-xl transition"></i>
+                    </button>
+                    <button onclick="selectPreset(20)" class="preset-btn p-3 bg-dark-900 hover:bg-dark-700 border border-gray-700 hover:border-amber-500/80 rounded-xl text-left transition group flex items-center justify-between">
+                        <div>
+                            <span class="block title-font font-bold text-amber-400 text-base">1d20</span>
+                            <span class="text-xs text-gray-400">二十面骰 (D&D)</span>
+                        </div>
+                        <i class="fa-solid fa-dice-d20 text-gray-600 group-hover:text-amber-400 text-xl transition"></i>
+                    </button>
+                    <button onclick="selectPreset(100)" class="preset-btn p-3 bg-dark-900 hover:bg-dark-700 border border-gray-700 hover:border-amber-500/80 rounded-xl text-left transition group flex items-center justify-between">
+                        <div>
+                            <span class="block title-font font-bold text-amber-400 text-base">1d100</span>
+                            <span class="text-xs text-gray-400">百面骰 (百分骰)</span>
+                        </div>
+                        <i class="fa-solid fa-percent text-gray-600 group-hover:text-amber-400 text-lg transition"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- History Log Section -->
+            <div class="bg-dark-800/80 border border-gray-700/80 rounded-2xl p-6 shadow-xl flex flex-col h-[340px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="title-font text-sm font-semibold text-gray-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+                        <span>擲骰歷史記錄</span>
+                    </h3>
+                    <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-400 transition flex items-center space-x-1">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>清除</span>
+                    </button>
+                </div>
+                
+                <!-- History Items Container -->
+                <div id="historyList" class="flex-grow overflow-y-auto space-y-2 pr-1">
+                    <div id="emptyHistory" class="h-full flex flex-col items-center justify-center text-center text-gray-500 text-xs py-8">
+                        <i class="fa-solid fa-box-open text-2xl mb-2 opacity-40"></i>
+                        <span>尚無擲骰記錄，點擊按鈕開始！</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-4 text-center text-xs text-gray-500 border-t border-gray-800/80 mt-auto">
+        <p>Epic Dice Roller &copy; 2026 | 支援任意面數的主動記憶多面骰助手</p>
+    </footer>
+
+    <!-- Notification Message Box -->
+    <div id="notification" class="fixed bottom-6 right-6 bg-dark-700 border border-amber-500/50 text-white px-4 py-3 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="fa-solid fa-bell"></i>
+        </div>
+        <div>
+            <p id="notifTitle" class="text-xs font-bold text-amber-400">提示</p>
+            <p id="notifDesc" class="text-xs text-gray-300">已成功記錄 N 值</p>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // State Management
+        let currentN = 6;
+        let soundEnabled = true;
+        let historyData = [];
+        let synth = null;
+
+        // Initialize Tone.js audio synth on first user interaction
+        function initAudio() {
+            if (!synth) {
+                try {
+                    synth = new Tone.Synth({
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
+                    }).toDestination();
+                } catch (e) {
+                    console.log("Audio init error:", e);
+                }
+            }
+        }
+
+        // Play rolling sound effect
+        function playRollSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            try {
+                const now = Tone.now();
+                if (synth) {
+                    synth.triggerAttackRelease("C4", "16n", now);
+                    synth.triggerAttackRelease("G4", "16n", now + 0.08);
+                    synth.triggerAttackRelease("C5", "8n", now + 0.16);
+                }
+            } catch (e) {
+                // Audio context might be restricted before gesture
+            }
+        }
+
+        // Toggle sound state
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            const text = document.getElementById('soundText');
+            if (soundEnabled) {
+                icon.className = "fa-solid fa-volume-high text-amber-400";
+                text.innerText = "音效開啟";
+                showNotification("音效狀態", "已開啟音效");
+            } else {
+                icon.className = "fa-solid fa-volume-xmark text-gray-500";
+                text.innerText = "音效關閉";
+                showNotification("音效狀態", "已關閉音效");
+            }
+        }
+
+        // Update active N value and refresh UI state
+        function setNValue(n, updateInput = true) {
+            const parsedN = parseInt(n);
+            if (isNaN(parsedN) || parsedN < 1) {
+                showNotification("錯誤", "請輸入大於 0 的有效數字！", true);
+                return;
+            }
+            currentN = parsedN;
+            
+            // Update UI memory display & label
+            document.getElementById('memoryDisplay').innerText = `1d${currentN}`;
+            document.getElementById('diceTypeLabel').innerText = `1d${currentN}`;
+            
+            if (updateInput) {
+                document.getElementById('customNInput').value = currentN;
+            }
+
+            // Update dice icon depending on N
+            updateDiceIcon(currentN);
+        }
+
+        // Choose appropriate icon representation
+        function updateDiceIcon(n) {
+            const iconEl = document.getElementById('diceIcon');
+            if (n === 6) {
+                iconEl.className = "fa-solid fa-dice-six text-4xl md:text-5xl text-dark-900 mb-2 drop-shadow";
+            } else if (n === 20) {
+                iconEl.className = "fa-solid fa-dice-d20 text-4xl md:text-5xl text-dark-900 mb-2 drop-shadow";
+            } else if (n === 10 || n === 100) {
+                iconEl.className = "fa-solid fa-dice text-4xl md:text-5xl text-dark-900 mb-2 drop-shadow";
+            } else {
+                iconEl.className = "fa-solid fa-cube text-4xl md:text-5xl text-dark-900 mb-2 drop-shadow";
+            }
+        }
+
+        // Select preset dice (1d6, 1d10, 1d20, 1d100)
+        function selectPreset(n) {
+            setNValue(n, true);
+            showNotification("快捷載入", `已切換至 1d${n} 骰子並記憶`);
+            rollCurrentDice();
+        }
+
+        // Set custom dice from input box
+        function setCustomDice() {
+            const val = document.getElementById('customNInput').value;
+            if (!val) {
+                showNotification("注意", "請先輸入自訂的 N 面數值", true);
+                return;
+            }
+            setNValue(val, true);
+            showNotification("記憶更新", `已成功設定並記憶 1d${currentN} 骰子`);
+        }
+
+        // Roll the current remembered dice
+        function rollCurrentDice() {
+            const diceBox = document.getElementById('diceBox');
+            const resultOutput = document.getElementById('resultOutput');
+
+            // Play sound
+            playRollSound();
+
+            // Trigger visual rolling animation
+            diceBox.classList.remove('dice-rolling');
+            void diceBox.offsetWidth; // trigger reflow
+            diceBox.classList.add('dice-rolling');
+
+            // Quick random number shuffle animation effect before final result
+            let counter = 0;
+            const shuffleInterval = setInterval(() => {
+                const tempRand = Math.floor(Math.random() * currentN) + 1;
+                resultOutput.innerText = tempRand;
+                counter++;
+                if (counter > 8) {
+                    clearInterval(shuffleInterval);
+                    finalizeRoll();
+                }
+            }, 40);
+        }
+
+        // Finalize roll and record history
+        function finalizeRoll() {
+            const finalResult = Math.floor(Math.random() * currentN) + 1;
+            const resultOutput = document.getElementById('resultOutput');
+            resultOutput.innerText = finalResult;
+
+            // Add to history list
+            const now = new Date();
+            const timeString = now.toTimeString().split(' ')[0];
+            const record = {
+                id: Date.now(),
+                dice: `1d${currentN}`,
+                result: finalResult,
+                time: timeString
+            };
+
+            historyData.unshift(record);
+            if (historyData.length > 25) historyData.pop(); // keep last 25
+            renderHistory();
+        }
+
+        // Render history items
+        function renderHistory() {
+            const listEl = document.getElementById('historyList');
+            if (historyData.length === 0) {
+                listEl.innerHTML = `
+                    <div id="emptyHistory" class="h-full flex flex-col items-center justify-center text-center text-gray-500 text-xs py-8">
+                        <i class="fa-solid fa-box-open text-2xl mb-2 opacity-40"></i>
+                        <span>尚無擲骰記錄，點擊按鈕開始！</span>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            historyData.forEach(item => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-dark-900/60 border border-gray-700/60 rounded-xl text-sm transition hover:border-amber-500/40">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2 py-1 bg-amber-500/10 text-amber-400 font-mono text-xs font-bold rounded border border-amber-500/20">${item.dice}</span>
+                            <span class="text-xs text-gray-400">${item.time}</span>
+                        </div>
+                        <div class="title-font font-bold text-lg text-amber-400">
+                            ${item.result}
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // Clear history log
+        function clearHistory() {
+            historyData = [];
+            renderHistory();
+            showNotification("記錄清單", "已清除所有擲骰記錄");
+        }
+
+        // Popup notification helper
+        function showNotification(title, desc, isError = false) {
+            const notif = document.getElementById('notification');
+            document.getElementById('notifTitle').innerText = title;
+            document.getElementById('notifDesc').innerText = desc;
+            
+            if (isError) {
+                notif.classList.remove('border-amber-500/50');
+                notif.classList.add('border-red-500/80');
+            } else {
+                notif.classList.remove('border-red-500/80');
+                notif.classList.add('border-amber-500/50');
+            }
+
+            notif.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                notif.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Enter key support for custom input
+        document.getElementById('customNInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setCustomDice();
+            }
+        });
+
+        // Initialize default view
+        window.onload = function() {
+            setNValue(6, true);
+        };
+    </script>
+</body>
+</html>
